@@ -44,9 +44,9 @@ jobs:
            --capabilities CAPABILITY_NAMED_IAM \
            --no-fail-on-empty-changeset || true
 
-       - name: Show Stack Events
-  run: |
-         aws cloudformation describe-stack-events \
-         --stack-name DikshaFullStack \
-         --max-items 20 \
-        --output table
+             - name: Show Stack Events
+        run: |
+           aws cloudformation describe-stack-events \
+           --stack-name DikshaFullStack \
+           --max-items 20 \
+           --output table
