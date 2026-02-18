@@ -25,13 +25,10 @@ jobs:
       - name: Deploy CloudFormation Stack
         run: |
           aws cloudformation deploy \
-            --stack-name MultiVPCStack \
-            --template-file template.yaml \
-            --parameter-overrides \
-              KeyName=${{ secrets.EC2_KEY_NAME }} \
-              DBUsername=${{ secrets.DB_USERNAME }} \
-              DBPassword=${{ secrets.DB_PASSWORD }} \
-            --capabilities CAPABILITY_NAMED_IAM
+            --stack-name dikshacloudformation \
+            --template-file cloud.yaml \
+           --parameter-overrides CustomKeyName=vockey \
+          --capabilities CAPABILITY_NAMED_IAM \
 
       - name: Get Stack Outputs
         run: |
