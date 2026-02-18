@@ -1,207 +1,265 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: Multi-VPC Architecture with ALB, AutoScaling, RDS and Peering
-
-Parameters:
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-  DBUsername:
-    Type: String
-  DBPassword:
-    Type: String
-    NoEcho: true
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Diksha Full Infrastructure Stack
 
 Resources:
 
-  VPCAPublic:
+  DikshaVPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
+      CidrBlock: 192.168.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: VPC-A
+          Value: DikshaVPC
 
-  InternetGateway:
+  DikshaPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DikshaVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 192.168.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: DikshaPublicSubnet1
+
+  DikshaPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DikshaVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 192.168.4.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: DikshaPublicSubnet2
+
+  DikshaPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DikshaVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 192.168.2.0/24
+      Tags:
+        - Key: Name
+          Value: DikshaPrivateSubnet1
+
+  DikshaPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DikshaVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 192.168.3.0/24
+      Tags:
+        - Key: Name
+          Value: DikshaPrivateSubnet2
+
+  DikshaIGW:
     Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: DikshaIGW
 
-  AttachIGW:
+  DikshaAttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPCAPublic
-      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref DikshaVPC
+      InternetGatewayId: !Ref DikshaIGW
 
-  PublicSubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPCAPublic
-      CidrBlock: 10.0.1.0/24
-      MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [0, !GetAZs ""]
-
-  PrivateSubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPCAPublic
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
-
-  PublicRouteTable:
+  DikshaPublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPCAPublic
+      VpcId: !Ref DikshaVPC
 
-  PublicRoute:
+  DikshaPublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: AttachIGW
+    DependsOn: DikshaAttachGateway
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref DikshaPublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      GatewayId: !Ref DikshaIGW
 
-  PublicSubnetRouteAssoc:
+  DikshaPublicSubnet1Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnetA
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref DikshaPublicSubnet1
+      RouteTableId: !Ref DikshaPublicRouteTable
 
-  VPCBPrivate:
-    Type: AWS::EC2::VPC
+  DikshaPublicSubnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      CidrBlock: 10.1.0.0/16
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: VPC-B
+      SubnetId: !Ref DikshaPublicSubnet2
+      RouteTableId: !Ref DikshaPublicRouteTable
 
-  PrivateSubnetB:
-    Type: AWS::EC2::Subnet
+  DikshaNatEIP:
+    Type: AWS::EC2::EIP
     Properties:
-      VpcId: !Ref VPCBPrivate
-      CidrBlock: 10.1.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      Domain: vpc
 
-  VPCPeering:
-    Type: AWS::EC2::VPCPeeringConnection
+  DikshaNatGateway:
+    Type: AWS::EC2::NatGateway
     Properties:
-      VpcId: !Ref VPCAPublic
-      PeerVpcId: !Ref VPCBPrivate
+      AllocationId: !GetAtt DikshaNatEIP.AllocationId
+      SubnetId: !Ref DikshaPublicSubnet1
 
+  DikshaPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DikshaVPC
 
+  DikshaPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref DikshaPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref DikshaNatGateway
 
-  ALBSG:
+  DikshaPrivateSubnet1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DikshaPrivateSubnet1
+      RouteTableId: !Ref DikshaPrivateRouteTable
+
+  DikshaPrivateSubnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DikshaPrivateSubnet2
+      RouteTableId: !Ref DikshaPrivateRouteTable
+
+  DikshaALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP
-      VpcId: !Ref VPCAPublic
+      GroupDescription: Allow HTTP from Internet
+      VpcId: !Ref DikshaVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  WebServerSG:
+  DikshaWebSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow ALB traffic
-      VpcId: !Ref VPCAPublic
+      GroupDescription: Allow HTTP from ALB
+      VpcId: !Ref DikshaVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          SourceSecurityGroupId: !Ref ALBSG
+          SourceSecurityGroupId: !Ref DikshaALBSecurityGroup
 
-  RDSSG:
+  DikshaRDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow MySQL from Web Servers
-      VpcId: !Ref VPCBPrivate
+      GroupDescription: Allow MySQL from Web
+      VpcId: !Ref DikshaVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          SourceSecurityGroupId: !Ref WebServerSG
+          SourceSecurityGroupId: !Ref DikshaWebSecurityGroup
 
-  ALB:
+  DikshaALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Scheme: internet-facing
       Subnets:
-        - !Ref PublicSubnetA
+        - !Ref DikshaPublicSubnet1
+        - !Ref DikshaPublicSubnet2
       SecurityGroups:
-        - !Ref ALBSG
+        - !Ref DikshaALBSecurityGroup
 
-  TargetGroup:
+  DikshaTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Port: 80
       Protocol: HTTP
-      VpcId: !Ref VPCAPublic
+      VpcId: !Ref DikshaVPC
+      TargetType: instance
 
-  Listener:
+  DikshaListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      LoadBalancerArn: !Ref ALB
+      LoadBalancerArn: !Ref DikshaALB
       Port: 80
       Protocol: HTTP
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TargetGroup
+          TargetGroupArn: !Ref DikshaTargetGroup
 
-
-
-  LaunchTemplate:
+  DikshaLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
         ImageId: ami-0c02fb55956c7d316
         InstanceType: t2.micro
-        KeyName: !Ref KeyName
         SecurityGroupIds:
-          - !Ref WebServerSG
+          - !Ref DikshaWebSecurityGroup
         UserData:
-          Fn::Base64: !Sub |
+          Fn::Base64: |
             #!/bin/bash
+            yum update -y
             yum install -y httpd
             systemctl start httpd
-            echo "Web Server Running" > /var/www/html/index.html
+            systemctl enable httpd
+            echo "Diksha Web Server Running" > /var/www/html/index.html
 
-  AutoScalingGroup:
+  DikshaASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier:
-        - !Ref PrivateSubnetA
+        - !Ref DikshaPrivateSubnet1
+        - !Ref DikshaPrivateSubnet2
       LaunchTemplate:
-        LaunchTemplateId: !Ref LaunchTemplate
-        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+        LaunchTemplateId: !Ref DikshaLaunchTemplate
+        Version: !GetAtt DikshaLaunchTemplate.LatestVersionNumber
       MinSize: 2
       MaxSize: 4
       DesiredCapacity: 2
       TargetGroupARNs:
-        - !Ref TargetGroup
+        - !Ref DikshaTargetGroup
 
-
-  DBSubnetGroup:
+  DikshaDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Subnet group
+      DBSubnetGroupDescription: Diksha DB Subnet Group
       SubnetIds:
-        - !Ref PrivateSubnetB
+        - !Ref DikshaPrivateSubnet1
+        - !Ref DikshaPrivateSubnet2
 
-  MyDB:
+  DikshaRDS:
     Type: AWS::RDS::DBInstance
     Properties:
       Engine: mysql
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
       DBInstanceClass: db.t3.micro
       AllocatedStorage: 20
+      MasterUsername: diksha
+      MasterUserPassword: Diksha1704
+      DBSubnetGroupName: !Ref DikshaDBSubnetGroup
       VPCSecurityGroups:
-        - !Ref RDSSG
-      DBSubnetGroupName: !Ref DBSubnetGroup
+        - !Ref DikshaRDSSecurityGroup
+      PubliclyAccessible: false
+      MultiAZ: false
 
-  ReadReplica:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      SourceDBInstanceIdentifier: !Ref MyDB
-      DBInstanceClass: db.t3.micro
+Outputs:
+  ALBDNS:
+    Description: ALB DNS Name
+    Value: !GetAtt DikshaALB.DNSName
+
+  DatabaseEndpoint:
+    Description: RDS Endpoint
+    Value: !GetAtt DikshaRDS.Endpoint.Address
