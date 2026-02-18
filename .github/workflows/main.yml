@@ -23,7 +23,7 @@ jobs:
           set -e
           aws cloudformation deploy \
             --stack-name DikshaFullStack \
-            --template-file template.yml \
+            --template-file cloud.yamal \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
